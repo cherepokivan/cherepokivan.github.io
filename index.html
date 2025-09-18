@@ -1,176 +1,64 @@
-<!DOCTYPE html><html lang="en">
+<!doctype html>
+<html lang="ru">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hand-Draw App+</title>
-<meta name="theme-color" content="#0b0b0c">
-<style>
-  :root{ --bg:#0b0b0c; --panel:#111214; --ink:#e6e6e6; --muted:#7f848a; --accent:#4c9aff; }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{ margin:0; background:var(--bg); color:var(--ink); font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif; overscroll-behavior:none; }
-  .app{ position:fixed; inset:0; display:grid; grid-template-rows:auto 1fr auto; }
-  header{ display:flex; align-items:center; gap:.75rem; padding: clamp(10px,2.2vmin,18px) clamp(12px,3vmin,22px); background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,0)); border-bottom:1px solid #1b1d21; backdrop-filter:saturate(120%) blur(6px); }
-  .dot{ width:.6rem; height:.6rem; border-radius:50%; background:var(--muted); box-shadow:0 0 0 2px #0b0b0c, 0 0 0 6px rgba(76,154,255,.12); transition:background .25s ease; }
-  .dot.on{ background:#30d158; box-shadow:0 0 0 2px #0b0b0c, 0 0 0 6px rgba(48,209,88,.18); }
-  h1{ font-size:clamp(16px,3.2vmin,22px); margin:0; }
-  .spacer{flex:1}
-  .pill{ border:1px solid #23262b; background:var(--panel); padding:.5rem .75rem; border-radius:999px; color:var(--muted); display:flex; align-items:center; gap:.5rem; }
-  .pill b{color:var(--ink); font-weight:600}
-  .btn{ appearance:none; border:1px solid #23262b; background:var(--panel); color:var(--ink); border-radius:12px; padding:.6rem .9rem; font-weight:600; cursor:pointer; }
-  .btn:active{ transform:translateY(1px) scale(.99) }
-  .btn.primary{ border-color:#2e6adb; background:linear-gradient(180deg,#2e6adb,#1c4eb6); color:white }
-  .toolbar{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,0)); border-top:1px solid #1b1d21; padding:.6rem .8rem; }
-  .slider,.toggle,.colorpicker{ display:flex; align-items:center; gap:.6rem; color:var(--muted); padding:.35rem .6rem; border:1px solid #23262b; border-radius:12px; background:var(--panel); }
-  .slider input{ accent-color:var(--accent); width:140px }
-  .colorpicker input{ width:40px; height:24px; border:none; background:transparent; cursor:pointer; }
-  .hint{ color:var(--muted); margin-left:auto; display:flex; align-items:center; gap:.4rem }
-  .kbd{ border:1px solid #23262b; background:#0f1113; padding:.2rem .45rem; border-radius:6px; color:#c9cdd3; font-variant:tabular-nums; }
-  .stage{ position:relative; overflow:hidden; background:radial-gradient(1200px 1200px at 80% -20%, rgba(76,154,255,.12), transparent), radial-gradient(1400px 900px at 10% 20%, rgba(76,154,255,.08), transparent); }
-  video, canvas{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; }
-  video{ transform: scaleX(-1); filter: saturate(105%) contrast(105%) brightness(95%); }
-  canvas{ pointer-events:none; }
-  .toast{ position:absolute; left:50%; top:16px; transform:translateX(-50%); background:#0f1113; border:1px solid #23262b; color:#d9d9d9; padding:.6rem .8rem; border-radius:12px; box-shadow:0 6px 24px rgba(0,0,0,.35); display:flex; align-items:center; gap:.6rem; z-index:10; }
-</style>
+  <meta charset="UTF-8">
+  <title>Плюсики</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body { font-family: sans-serif; background:#f6f7fb; text-align:center; }
+    .card { background:#fff; padding:20px; margin:20px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,.2); }
+    button { padding:10px 20px; border:none; border-radius:8px; background:#2563eb; color:#fff; cursor:pointer; }
+  </style>
 </head>
 <body>
-<div class="app">
-  <header>
-    <div class="dot" id="status-dot" title="Camera status"></div>
-    <h1>Hand-Draw App+</h1>
-    <div class="spacer"></div>
-    <div class="pill" id="mode-indicator">Mode: <b id="mode-label">Idle</b></div>
-    <button class="btn ghost" id="undo-btn">Undo</button>
-    <button class="btn ghost" id="clear-btn">Clear</button>
-    <button class="btn primary" id="save-btn">Save</button>
-    <button class="btn ghost" id="switch-btn">Switch Camera</button>
-  </header>
-  <main class="stage" id="stage">
-    <div class="toast" id="toast">Grant camera access, then pinch your <b>index</b> and <b>thumb</b> to draw ✍️</div>
-    <video id="video" playsinline autoplay muted></video>
-    <canvas id="overlay"></canvas>
-    <canvas id="draw"></canvas>
-  </main>
-  <footer class="toolbar">
-    <div class="slider">Stroke <span id="stroke-val" class="kbd">4</span><input id="stroke" type="range" min="1" max="20" step="1" value="4" /></div>
-    <div class="colorpicker">Color <input type="color" id="color" value="#e6e6e6"></div>
-    <div class="toggle"><label><input id="guides" type="checkbox" /> Show guides</label></div>
-    <div class="hint"><span>Tip: pinch with index & thumb to draw</span></div>
-  </footer>
-</div><script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script><script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script><script>
-(function(){
-  const video = document.getElementById('video');
-  const overlay = document.getElementById('overlay');
-  const draw = document.getElementById('draw');
-  const ctxO = overlay.getContext('2d');
-  const ctxD = draw.getContext('2d', { alpha: true });
-  const dot = document.getElementById('status-dot');
-  const modeLabel = document.getElementById('mode-label');
-  const toast = document.getElementById('toast');
-  const clearBtn = document.getElementById('clear-btn');
-  const undoBtn = document.getElementById('undo-btn');
-  const saveBtn = document.getElementById('save-btn');
-  const switchBtn = document.getElementById('switch-btn');
-  const strokeRange = document.getElementById('stroke');
-  const strokeVal = document.getElementById('stroke-val');
-  const colorInput = document.getElementById('color');
-  const showGuides = document.getElementById('guides');
+  <div id="content" class="card">Загрузка...</div>
 
-  let pinchActive = false;
-  let lastPoint = null;
-  let guides = false;
-  let lineWidth = +strokeRange.value;
-  let color = colorInput.value;
-  let camera;
-  let currentFacingMode = 'user';
+<script>
+const tg = window.Telegram.WebApp;
+tg.expand();
+const user = tg.initDataUnsafe?.user;
 
-  // history for undo
-  let history = [];
-  function saveState(){ history.push(ctxD.getImageData(0,0,draw.width,draw.height)); if(history.length>30) history.shift(); }
-  function undo(){ if(history.length){ ctxD.putImageData(history.pop(),0,0); } }
+const students = [123456789, 111111111];
+const teachers = [222222222, 333333333];
 
-  // Resize
-  const resize = () => {
-    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    for (const c of [overlay, draw]) {
-      const rect = c.parentElement.getBoundingClientRect();
-      c.width  = Math.floor(rect.width * dpr);
-      c.height = Math.floor(rect.height * dpr);
-      c.style.width = rect.width + 'px';
-      c.style.height = rect.height + 'px';
-      c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-    ctxD.lineCap = 'round';
-    ctxD.lineJoin = 'round';
-  };
-  addEventListener('resize', resize, { passive:true });
-
-  // UI events
-  strokeRange.addEventListener('input', () => { lineWidth = +strokeRange.value; strokeVal.textContent = lineWidth; localStorage.setItem('lineWidth', lineWidth); });
-  colorInput.addEventListener('input', () => { color = colorInput.value; localStorage.setItem('color', color); });
-  showGuides.addEventListener('change', () => guides = showGuides.checked);
-  clearBtn.addEventListener('click', () => { ctxD.clearRect(0,0,draw.width,draw.height); lastPoint = null; history=[]; });
-  undoBtn.addEventListener('click', undo);
-  saveBtn.addEventListener('click', () => { const a=document.createElement('a'); a.download='drawing.png'; a.href=draw.toDataURL('image/png'); a.click(); });
-  switchBtn.addEventListener('click', () => { currentFacingMode = currentFacingMode==='user'?'environment':'user'; start(); });
-
-  // Load saved settings
-  if(localStorage.getItem('lineWidth')){ lineWidth = +localStorage.getItem('lineWidth'); strokeRange.value=lineWidth; strokeVal.textContent=lineWidth; }
-  if(localStorage.getItem('color')){ color = localStorage.getItem('color'); colorInput.value=color; }
-
-  // MediaPipe
-  const hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-  hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-  hands.onResults(onResults);
-
-  async function start(){
-    resize();
-    try{
-      if(camera) camera.stop();
-      dot.classList.remove('on');
-      camera = new Camera(video, { onFrame: async () => { await hands.send({ image: video }); }, width: 960, height: 720, facingMode: currentFacingMode });
-      await camera.start();
-      dot.classList.add('on');
-      toast.style.display='none';
-    }catch(err){ console.error(err); toast.innerHTML='Camera access failed. Check permissions.'; }
+async function render() {
+  if (!user) {
+    document.getElementById("content").innerHTML = "Ошибка авторизации";
+    return;
   }
 
-  function toCanvas(x, y){ return { x: overlay.clientWidth * (1 - x), y: overlay.clientHeight * y }; }
-  const PINCH_ON=0.05,PINCH_OFF=0.07;
-  function onResults(results){
-    ctxO.clearRect(0,0,overlay.clientWidth,overlay.clientHeight);
-    if (!results.multiHandLandmarks?.length){ setMode(false); lastPoint=null; return; }
-    const lm = results.multiHandLandmarks[0];
-    const t = lm[4], i = lm[8];
-    const dist = Math.hypot(t.x - i.x, t.y - i.y);
-    if (!pinchActive && dist < PINCH_ON){ pinchActive=true; saveState(); }
-    else if (pinchActive && dist > PINCH_OFF) pinchActive=false;
-    setMode(pinchActive);
-    const mid={x:(t.x+i.x)/2,y:(t.y+i.y)/2};
-    const p=toCanvas(mid.x,mid.y);
-    if (pinchActive){
-      if (!lastPoint) lastPoint = p;
-      const dxp = p.x - lastPoint.x, dyp = p.y - lastPoint.y;
-      const distPix = Math.hypot(dxp, dyp);
-      const steps = Math.max(1, Math.min(8, Math.floor(distPix / 3)));
-      ctxD.strokeStyle = color; ctxD.lineWidth = lineWidth;
-      ctxD.beginPath(); ctxD.moveTo(lastPoint.x,lastPoint.y);
-      for(let s=1;s<=steps;s++) ctxD.lineTo(lastPoint.x+dxp*(s/steps), lastPoint.y+dyp*(s/steps));
-      ctxD.stroke();
-      lastPoint=p;
-    } else { lastPoint=null; }
-    if (guides){
-      const tt=toCanvas(t.x,t.y), ii=toCanvas(i.x,i.y);
-      ctxO.strokeStyle='rgba(156,197,255,.5)'; ctxO.lineWidth=2;
-      ctxO.beginPath(); ctxO.moveTo(tt.x,tt.y); ctxO.lineTo(ii.x,ii.y); ctxO.stroke();
-      ctxO.fillStyle=pinchActive?'rgba(48,209,88,.95)':'rgba(200,200,200,.7)';
-      ctxO.beginPath(); ctxO.arc(p.x,p.y,6,0,Math.PI*2); ctxO.fill();
-    }
+  if (teachers.includes(user.id)) {
+    document.getElementById("content").innerHTML = `
+      <h2>Админ-панель</h2>
+      <label>Выбери ученика:</label><br>
+      <select id="student">
+        ${students.map(id => `<option value="${id}">${id}</option>`).join("")}
+      </select><br><br>
+      <button onclick="givePlus()">Выдать плюсик</button>
+    `;
+  } else if (students.includes(user.id)) {
+    const res = await fetch("/api/balance?user_id=" + user.id);
+    const data = await res.json();
+    document.getElementById("content").innerHTML = `
+      <h2>Твой баланс</h2>
+      <p>У тебя ${data.balance} плюсиков</p>
+    `;
+  } else {
+    document.getElementById("content").innerHTML = "Ты не в системе 👀";
   }
+}
 
-  function setMode(active){ modeLabel.textContent=active?'Drawing':'Idle'; }
+async function givePlus() {
+  const studentId = document.getElementById("student").value;
+  await fetch("/api/give", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({teacher_id: user.id, student_id: studentId})
+  });
+  alert("Плюсик выдан!");
+}
 
-  start();
-})();
-</script></body>
-                                     </html>
+render();
+</script>
+</body>
+</html>
